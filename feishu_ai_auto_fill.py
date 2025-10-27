@@ -70,4 +70,4 @@ if __name__ == "__main__":
     def health_check():
         return "ok", 200
 
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=10000, debug=False)
