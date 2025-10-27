@@ -5,7 +5,7 @@ import requests
 
 app = Flask(__name__)
 
-# 从环境变量读取你的 OpenAI 密钥
+# 从环境变量读取 OpenAI 密钥
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/", methods=["GET"])
@@ -16,11 +16,19 @@ def home():
 @app.route("/feishu_webhook", methods=["POST"])
 def feishu_webhook():
     try:
-        data = request.get_json()
-        product_name = data.get("product_name", "")
-        competitor_url = data.get("competitor_url", "")
+        data = request.get_json(force=True)
+        print(f"🪶 接收到数据: {data}")
 
-        # 如果飞书只传了一个字段，也兼容处理
+        # 兼容飞书自动化传递对象形式
+        def safe_str(value):
+            if isinstance(value, dict):
+                return value.get("text", "") or value.get("value", "") or str(value)
+            return str(value) if value else ""
+
+        product_name = safe_str(data.get("product_name"))
+        competitor_url = safe_str(data.get("competitor_url"))
+
+        # 如果飞书只传了一个字段，也兼容 text
         if not product_name and "text" in data:
             product_name = data["text"]
 
@@ -48,9 +56,9 @@ def feishu_webhook():
 
         # 调用 OpenAI 新版接口
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",  # 可改为 gpt-4o 或 gpt-3.5-turbo
+            model="gpt-4o-mini",  # 可改成 gpt-4o
             messages=[
-                {"role": "system", "content": "你是一个擅长撰写俄语电商文案的 AI 助手。"},
+                {"role": "system", "content": "你是一个擅长撰写俄语电商文案的AI助手。"},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -58,7 +66,7 @@ def feishu_webhook():
         reply = completion.choices[0].message.content.strip()
         print(f"✅ 生成成功：{reply}")
 
-        # ✅ 这里返回结构化 JSON（飞书自动写入表格）
+        # ✅ 返回结构化 JSON（飞书自动写入表格）
         return jsonify({
             "result": {
                 "title": reply.split("标题（俄语）：")[-1].split("描述（俄语）：")[0].strip(),
