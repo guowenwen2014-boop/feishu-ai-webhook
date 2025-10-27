@@ -66,4 +66,7 @@ def feishu_webhook():
 
 
 if __name__ == "__main__":
+    @app.route("/healthz")
+def health_check():
+    return "ok", 200
     app.run(host="0.0.0.0", port=8080)
