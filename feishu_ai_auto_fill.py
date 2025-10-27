@@ -35,7 +35,7 @@ def feishu_webhook():
 
         # 构造 prompt
         prompt = f"""
-        你是一名俄语跨境电商文案专家，请根据以下信息生成适用于Ozon或Yandex的产品标题与描述：
+        你是一名俄语跨境电商文案专家，请根据以下信息生成适用于 Ozon 或 Yandex 的产品标题与描述：
         - 产品中文名称：{product_name}
         - 竞品网页内容（可能部分）：{competitor_info}
 
@@ -48,9 +48,9 @@ def feishu_webhook():
 
         # 调用 OpenAI 新版接口
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",  # 可以改成 gpt-4o 或 gpt-3.5-turbo
+            model="gpt-4o-mini",  # 可改为 gpt-4o 或 gpt-3.5-turbo
             messages=[
-                {"role": "system", "content": "你是一个擅长撰写俄语电商文案的AI助手。"},
+                {"role": "system", "content": "你是一个擅长撰写俄语电商文案的 AI 助手。"},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -58,7 +58,13 @@ def feishu_webhook():
         reply = completion.choices[0].message.content.strip()
         print(f"✅ 生成成功：{reply}")
 
-        return jsonify({"result": reply})
+        # ✅ 这里返回结构化 JSON（飞书自动写入表格）
+        return jsonify({
+            "result": {
+                "title": reply.split("标题（俄语）：")[-1].split("描述（俄语）：")[0].strip(),
+                "desc": reply.split("描述（俄语）：")[-1].strip()
+            }
+        })
 
     except Exception as e:
         print(f"❌ 出错：{str(e)}")
@@ -68,6 +74,7 @@ def feishu_webhook():
 @app.route("/healthz")
 def health_check():
     return "ok", 200
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
