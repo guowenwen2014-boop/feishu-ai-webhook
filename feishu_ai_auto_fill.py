@@ -24,6 +24,9 @@ def safe_str(value):
 def feishu_webhook():
     try:
         data = request.get_json(force=True)
+        if isinstance(data, str):  # 🔥 关键新增
+            import json
+            data = json.loads(data)
         print(f"📩 接收到数据: {data}")
 
         competitor_url = safe_str(data.get("competitor_url"))
