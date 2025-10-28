@@ -9,62 +9,39 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Feishu AI Webhook 已成功部署 💫", 200
+    return "Feishu AI Webhook 极简版 💫 已部署成功", 200
 
 @app.route("/feishu_webhook", methods=["POST"])
 def feishu_webhook():
     try:
-        # ✅ 兼容各种请求格式
-        raw_data = request.data.decode("utf-8", errors="ignore")
-        print(f"🪶 原始请求体: {raw_data}")
+        # ✅ 解析飞书传入数据
+        data = request.get_json(force=True)
+        competitor_url = data.get("competitor_url", "")
 
+        if not competitor_url:
+            return jsonify({"error": "缺少竞品链接 competitor_url"}), 400
+
+        # ✅ 获取竞品网页文本内容
         try:
-            data = json.loads(raw_data)
-        except Exception:
-            try:
-                data = request.form.to_dict()
-            except Exception:
-                data = {}
-        print(f"✅ 解析后数据: {data}")
+            resp = requests.get(competitor_url, timeout=6)
+            competitor_info = resp.text[:2000]  # 限制长度避免超长
+        except:
+            competitor_info = "无法访问竞品链接。"
 
-        # ✅ 安全取值函数
-        def safe_str(value):
-            if isinstance(value, dict):
-                return value.get("text") or value.get("value") or str(value)
-            return str(value) if value else ""
-
-        # ✅ 飞书字段兼容性增强版
-        product_name = safe_str(
-            data.get("product_name")
-            or data.get("A_产品中文名称")
-            or data.get("产品中文名称")
-            or data.get("text")
-        )
-        competitor_url = safe_str(
-            data.get("competitor_url")
-            or data.get("B_竞品链接")
-            or data.get("竞品链接")
-        )
-
-        # ✅ 检查是否拿到了字段
-        print(f"🧩 最终解析结果：产品名={product_name}, 竞品链接={competitor_url}")
-
-        # ✅ 抓取竞品网页部分内容
-        competitor_info = ""
-        if competitor_url:
-            try:
-                resp = requests.get(competitor_url, timeout=6)
-                competitor_info = resp.text[:1000]
-            except:
-                competitor_info = "无法访问竞品链接。"
-
-        # ✅ 构造 prompt
+        # ✅ 构造 prompt，增加字数限制说明
         prompt = f"""
-        你是一名俄语跨境电商文案专家，请根据以下信息生成适用于 Ozon 或 Yandex 的产品标题与描述：
-        - 产品中文名称：{product_name}
-        - 竞品网页内容（部分）：{competitor_info}
+        你是一名俄语跨境电商文案专家。
+        请根据以下网页内容，为 Ozon 平台生成“俄语产品标题”和“俄语产品描述”。
+        要求：
+        - 俄语标题必须在150个字符以内；
+        - 俄语描述必须在1000个字符以内；
+        - 内容自然流畅、可读性强；
+        - 避免重复、关键词堆砌。
 
-        输出格式如下：
+        以下是竞品网页内容（部分）：
+        {competitor_info}
+
+        输出格式如下（请严格遵守）：
         ---
         标题（俄语）：
         描述（俄语）：
@@ -83,13 +60,11 @@ def feishu_webhook():
         reply = completion.choices[0].message.content.strip()
         print(f"✅ 生成成功: {reply}")
 
-        # ✅ 提取结果
+        # ✅ 拆分结果（飞书自动填入两个单元格）
         result = {
             "title": reply.split("标题（俄语）：")[-1].split("描述（俄语）：")[0].strip(),
             "desc": reply.split("描述（俄语）：")[-1].strip()
         }
-
-        print(f"🏁 输出结果：{result}")
 
         return jsonify({"result": result})
 
@@ -97,11 +72,9 @@ def feishu_webhook():
         print(f"❌ 出错: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/healthz")
 def health_check():
     return "ok", 200
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
